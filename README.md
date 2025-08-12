@@ -2,6 +2,8 @@
 
 微信号：ShiYuan_Seeker
 
+需要技术支持麻烦添加下客服微信，淘宝等平台不允许提供第三方联系方式，请不要再淘宝问技术支持相关问题，一律不回也不做任何技术支持
+
 ![](https://img.shields.io/badge/ROS-Noetic-brightgreen)  
 ![](https://img.shields.io/badge/LICENSE-MIT-green.svg)
 
