@@ -51,9 +51,10 @@ install(TARGETS seeker_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# install(TARGETS ${LIB_DIR}/libseeker.so
-#   DESTINATION lib/${PROJECT_NAME}
-# )
+install(FILES
+  ${LIB_DIR}/libseeker.so
+  DESTINATION lib/
+)
 
 install(DIRECTORY 
   launch/ros2
