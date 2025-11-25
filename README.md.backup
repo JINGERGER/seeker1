@@ -1,40 +1,6 @@
-# ROS2 Humble 支持
+1125/2025
 
-本分支在原 ROS1 Noetic SDK 基础上添加了 **ROS2 Humble** 支持，主要贡献：
-
-- ✅ **图像去畸变**：实现了 MEI (Mei Unified Omnidirectional) 相机模型的正确去畸变算法
-- ✅ **视差转深度**：支持将视差图转换为度量深度图，带运行时开关
-- ✅ **可配置视场**：支持通过 `fov_scale` 参数调整去畸变后的视野范围
-
-## ROS2 快速开始
-
-```bash
-# 编译
-cd ~/ros2_ws
-colcon build --packages-select seeker --symlink-install
-
-# 启动（基础模式）
-ros2 launch seeker 1seeker.launch.py
-
-# 启动（自定义视场）
-ros2 launch seeker 1seeker.launch.py undistort_fov_scale:=2.0
-
-# 启用深度图输出
-ros2 param set /disparity_to_depth enabled true
-```
-
-**参数说明：**
-- `use_undistort`: 是否启用去畸变（默认 `true`）
-- `undistort_fov_scale`: 视场缩放（默认 `1.5`，推荐 `1.5-2.5`，越大视野越宽）
-- `use_depth`: 是否启动时就启用深度图转换（默认 `false`）
-
-**输出话题：**
-- `/fisheye/{left,right,bright,bleft}/image_raw` - 原始鱼眼图像
-- `/fisheye_rect/{left,right,bright,bleft}/image_raw` - 去畸变后图像
-- `/{front,right,back,left}/disparity` - 视差消息
-- `/{front,right,back,left}/depth/image_raw` - 深度图（需启用）
-
----
+Support ROS2 HUMBLE
 
 
 
