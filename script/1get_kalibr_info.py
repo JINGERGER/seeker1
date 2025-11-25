@@ -30,7 +30,7 @@ def inv_T(T):
     t = T[:3, 3]
     R_inv = np.linalg.inv(R)
     t_inv = np.dot(-R_inv, t)
-    T_inv = np.mat(np.zeros((4, 4)))
+    T_inv = np.asmatrix(np.zeros((4, 4)))
     T_inv[:3, :3] = R_inv
     T_inv[:3, 3] = t_inv
     T_inv[3, 3] = 1
@@ -139,7 +139,7 @@ def get_camera_info(cam):
         cam.T_cam_imu_se3_qy, cam.T_cam_imu_se3_qz,
         cam.T_cam_imu_se3_x, cam.T_cam_imu_se3_y, cam.T_cam_imu_se3_z
     ).tolist()
-    output["T_imu_cam"] = inv_T(np.mat(quaternion_to_rotation_matrix(
+    output["T_imu_cam"] = inv_T(np.asmatrix(quaternion_to_rotation_matrix(
         cam.T_cam_imu_se3_qw, cam.T_cam_imu_se3_qx,
         cam.T_cam_imu_se3_qy, cam.T_cam_imu_se3_qz,
         cam.T_cam_imu_se3_x, cam.T_cam_imu_se3_y, cam.T_cam_imu_se3_z

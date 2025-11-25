@@ -3,9 +3,9 @@ project(seeker)
 
 find_package(OpenCV REQUIRED)
 
-if($ENV{ROS_VERSION} EQUAL 1)
+if("$ENV{ROS_VERSION}" EQUAL "1")
   find_package(catkin QUIET COMPONENTS roscpp)
-elseif($ENV{ROS_VERSION} EQUAL 2)
+elseif("$ENV{ROS_VERSION}" EQUAL "2")
   find_package(ament_cmake QUIET)
 endif()
 

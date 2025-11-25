@@ -1,6 +1,11 @@
+#!/usr/bin/env python3
+"""
+Launch file to start seeker node with rqt showing all camera images
+"""
+
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
 from ament_index_python.packages import get_package_share_directory
@@ -37,15 +42,9 @@ def generate_launch_description():
         description='是否启用时间同步'
     )
     
-    use_rviz_arg = DeclareLaunchArgument(
-        'use_rviz',
-        default_value='false',
-        description='是否启动RViz2'
-    )
-    
     use_undistort_arg = DeclareLaunchArgument(
         'use_undistort',
-        default_value='true',
+        default_value='false',
         description='是否启用图像去畸变'
     )
     
@@ -63,14 +62,8 @@ def generate_launch_description():
     
     undistort_fov_scale_arg = DeclareLaunchArgument(
         'undistort_fov_scale',
-        default_value='1.5',
-        description='视场缩放 (>1.0: 视野变宽, <1.0: 视野变窄, 推荐: 1.2-2.0)'
-    )
-    
-    use_depth_arg = DeclareLaunchArgument(
-        'use_depth',
-        default_value='false',
-        description='是否启用深度图转换'
+        default_value='0.4',
+        description='视场缩放 (0.3-0.5: 放大中心区域避免圆形边缘)'
     )
 
     seeker_node = Node(
@@ -88,45 +81,33 @@ def generate_launch_description():
         }]
     )
     
-    # RViz2配置文件路径
-    rviz_config_dir = os.path.join(
-        get_package_share_directory('seeker'),
-        'config',
-        'seeker.rviz'
-    )
-    
-    # Omni Undistortion node (correct MEI model implementation)
+    # Undistortion node
     undistort_node = Node(
         package='seeker',
-        executable='omni_undistort_node.py',
-        name='omni_undistort_node',
+        executable='undistort_node.py',
+        name='undistort_node',
         output='screen',
         parameters=[{
             'config_file': 'seeker_omni_depth/kalibr_cam_chain.yaml',
             'scale': LaunchConfiguration('undistort_scale'),
+            'alpha': LaunchConfiguration('undistort_alpha'),
             'fov_scale': LaunchConfiguration('undistort_fov_scale')
         }],
         condition=IfCondition(LaunchConfiguration('use_undistort'))
     )
     
-    rviz_node = Node(
-        package='rviz2',
-        executable='rviz2',
-        name='rviz2',
-        arguments=['-d', rviz_config_dir],
-        output='screen',
-        condition=IfCondition(LaunchConfiguration('use_rviz'))
-    )
+    # Get perspective file path
+    try:
+        pkg_share = get_package_share_directory('seeker')
+        perspective_file = os.path.join(pkg_share, 'config', 'seeker_images.perspective')
+    except:
+        # Fallback to source directory
+        perspective_file = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'seeker_images.perspective')
     
-    # Depth conversion node (always started, internal 'enabled' parameter controls publishing)
-    depth_node = Node(
-        package='seeker',
-        executable='disparity_to_depth.py',
-        name='disparity_to_depth',
-        output='screen',
-        parameters=[{
-            'enabled': LaunchConfiguration('use_depth')
-        }]
+    # Launch rqt with the perspective file to show all images in one window
+    rqt_process = ExecuteProcess(
+        cmd=['rqt', '--perspective-file', perspective_file, '--force-discover'],
+        output='screen'
     )
 
     return LaunchDescription([
@@ -135,14 +116,11 @@ def generate_launch_description():
         pub_disparity_arg,
         pub_imu_arg,
         time_sync_arg,
-        use_rviz_arg,
         use_undistort_arg,
         undistort_scale_arg,
         undistort_alpha_arg,
         undistort_fov_scale_arg,
-        use_depth_arg,
         seeker_node,
         undistort_node,
-        depth_node,
-        rviz_node
+        rqt_process
     ])

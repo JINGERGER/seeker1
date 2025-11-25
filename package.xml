@@ -11,10 +11,13 @@
   <depend condition="$ROS_VERSION == 2">roscpp</depend>
   <depend condition="$ROS_VERSION == 2">std_msgs</depend>
   <depend condition="$ROS_VERSION == 2">sensor_msgs</depend>
+  <depend condition="$ROS_VERSION == 2">stereo_msgs</depend>
   <depend condition="$ROS_VERSION == 2">cv_bridge</depend>
   <depend condition="$ROS_VERSION == 2">image_transport</depend>
   <depend condition="$ROS_VERSION == 2">rclcpp</depend>
   <depend condition="$ROS_VERSION == 2">rclcpp_components</depend>
+  <exec_depend condition="$ROS_VERSION == 2">python3-yaml</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">python3-opencv</exec_depend>
 
   <buildtool_depend condition="$ROS_VERSION == 1">catkin</buildtool_depend>
   <depend condition="$ROS_VERSION == 1">roscpp</depend>

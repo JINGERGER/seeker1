@@ -35,13 +35,16 @@ target_include_directories(seeker_node
     ${OpenCV_INCLUDE_DIRS}
 )
 
+ament_target_dependencies(seeker_node
+  rclcpp
+  sensor_msgs
+  stereo_msgs
+  cv_bridge
+  image_transport
+)
+
 target_link_libraries(seeker_node
-  ${rclcpp_LIBRARIES}
   ${OpenCV_LIBRARIES}
-  ${sensor_msgs_LIBRARIES}
-  ${stereo_msgs_LIBRARIES}
-  ${cv_bridge_LIBRARIES}
-  ${image_transport_LIBRARIES}
   seeker
   usb-1.0
 )
@@ -56,11 +59,22 @@ install(FILES
   DESTINATION lib/
 )
 
+# 安装Python脚本
+install(PROGRAMS
+    script/undistort_node.py
+    script/omni_undistort_node.py
+    script/disparity_to_depth.py
+    DESTINATION lib/${PROJECT_NAME}
+)
+
 install(DIRECTORY 
   launch/ros2
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(DIRECTORY ./config/ DESTINATION share/${PROJECT_NAME}/config/)
+install(DIRECTORY 
+  config/
+  DESTINATION share/${PROJECT_NAME}/config/
+)
 
 ament_package()
