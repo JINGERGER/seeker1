@@ -3,8 +3,11 @@
 本分支在原 ROS1 Noetic SDK 基础上添加了 **ROS2 Humble** 支持，主要贡献：
 
 - ✅ **图像去畸变**：实现了 MEI (Mei Unified Omnidirectional) 相机模型的正确去畸变算法
+- ✅ **压缩图像输出**：去畸变后以 JPEG 压缩发布，带宽从 ~18 MB/s 降至 ~1-2 MB/s
+- ✅ **NumPy 2.x 兼容**：移除 cv_bridge 依赖，直接用 numpy 做 ROS↔OpenCV 转换（兼容 Ubuntu 22.04 / Python 3.10）
 - ✅ **视差转深度**：支持将视差图转换为度量深度图，带运行时开关
 - ✅ **可配置视场**：支持通过 `fov_scale` 参数调整去畸变后的视野范围
+- ✅ **最小化默认话题**：所有非必要话题（视差/深度/IMU/原始鱼眼）默认关闭，按需开启
 
 ## ROS2 快速开始
 
@@ -13,26 +16,48 @@
 cd ~/ros2_ws
 colcon build --packages-select seeker --symlink-install
 
-# 启动（基础模式）
+# 启动（基础模式，默认只输出去畸变压缩图像）
 ros2 launch seeker 1seeker.launch.py
 
-# 启动（自定义视场）
+# 自定义视场（推荐 1.5-2.5，越大视野越宽）
 ros2 launch seeker 1seeker.launch.py undistort_fov_scale:=2.0
 
-# 启用深度图输出
+# 同时发布未压缩原始图像
+ros2 launch seeker 1seeker.launch.py undistort_pub_raw:=true
+
+# 启用所有话题
+ros2 launch seeker 1seeker.launch.py pub_fisheye_raw:=true pub_disparity_img:=true pub_disparity:=true pub_imu:=true
+
+# 运行时启用深度图输出
 ros2 param set /disparity_to_depth enabled true
 ```
 
 **参数说明：**
-- `use_undistort`: 是否启用去畸变（默认 `true`）
-- `undistort_fov_scale`: 视场缩放（默认 `1.5`，推荐 `1.5-2.5`，越大视野越宽）
-- `use_depth`: 是否启动时就启用深度图转换（默认 `false`）
 
-**输出话题：**
-- `/fisheye/{left,right,bright,bleft}/image_raw` - 原始鱼眼图像
-- `/fisheye_rect/{left,right,bright,bleft}/image_raw` - 去畸变后图像
-- `/{front,right,back,left}/disparity` - 视差消息
-- `/{front,right,back,left}/depth/image_raw` - 深度图（需启用）
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `use_undistort` | `true` | 是否启用去畸变节点 |
+| `undistort_fov_scale` | `1.5` | 视场缩放（>1.0 视野变宽） |
+| `undistort_jpeg_quality` | `80` | 压缩图像 JPEG 质量（1-100） |
+| `undistort_pub_raw` | `false` | 是否同时发布未压缩原始图像 |
+| `pub_fisheye_raw` | `false` | 是否发布原始鱼眼图像和 `/all/compressed` |
+| `pub_disparity_img` | `false` | 是否发布视差原始图像 |
+| `pub_disparity` | `false` | 是否发布视差消息 |
+| `pub_imu` | `false` | 是否发布 IMU 数据 |
+| `use_depth` | `false` | 是否启动时就启用深度图转换 |
+
+**默认输出话题（最小模式）：**
+- `/fisheye_rect/{left,right,bright,bleft}/image_raw/compressed` - 去畸变 JPEG 压缩图像 ⭐
+
+**可选话题（按需启用）：**
+- `/fisheye_rect/{left,right,bright,bleft}/image_raw` - 去畸变未压缩图像（`undistort_pub_raw:=true`）
+- `/fisheye/{left,right,bright,bleft}/image_raw` - 原始鱼眼图像（`pub_fisheye_raw:=true`）
+- `/{front,right,back,left}/disparity` - 视差消息（`pub_disparity:=true`）
+- `/{front,right,back,left}/disparity/image_raw` - 视差图像（`pub_disparity_img:=true`）
+- `/{front,right,back,left}/depth/image_raw` - 深度图（`use_depth:=true`）
+- `/imu_data_raw` - IMU 数据（`pub_imu:=true`）
+
+> 📄 完整流水线说明、标定方法和故障排查请参阅 [ROS2_SEEKER.md](./ROS2_SEEKER.md)
 
 ---
 

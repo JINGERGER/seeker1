@@ -6,13 +6,40 @@ Properly handles the unified omnidirectional camera model with xi parameter
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
+from sensor_msgs.msg import Image, CompressedImage
 import cv2
 import numpy as np
 import yaml
 import os
 from ament_index_python.packages import get_package_share_directory
+
+# ── NumPy 2.x 兼容：不使用 cv_bridge，直接用 numpy 做 ROS↔OpenCV 转换 ──
+ENC_TO_DTYPE = {
+    'bgr8':   (np.uint8,  3),
+    'rgb8':   (np.uint8,  3),
+    'mono8':  (np.uint8,  1),
+    'mono16': (np.uint16, 1),
+    '16UC1':  (np.uint16, 1),
+    '8UC1':   (np.uint8,  1),
+    '8UC3':   (np.uint8,  3),
+}
+
+def imgmsg_to_cv2(msg):
+    dtype, channels = ENC_TO_DTYPE.get(msg.encoding, (np.uint8, 3))
+    arr = np.frombuffer(msg.data, dtype=dtype).reshape(msg.height, msg.width, channels) \
+          if channels > 1 else \
+          np.frombuffer(msg.data, dtype=dtype).reshape(msg.height, msg.width)
+    return arr.copy()
+
+def cv2_to_imgmsg(img, encoding, header):
+    msg = Image()
+    msg.header = header
+    msg.height, msg.width = img.shape[:2]
+    msg.encoding = encoding
+    msg.is_bigendian = 0
+    msg.step = img.shape[1] * img.dtype.itemsize * (img.shape[2] if img.ndim == 3 else 1)
+    msg.data = img.tobytes()
+    return msg
 
 
 class OmniUndistortNode(Node):
@@ -23,15 +50,19 @@ class OmniUndistortNode(Node):
         self.declare_parameter('config_file', 'seeker_omni_depth/kalibr_cam_chain.yaml')
         self.declare_parameter('scale', 0.5)
         self.declare_parameter('fov_scale', 1.5)  # >1.0: 视野变宽, <1.0: 视野变窄, 推荐: 1.2-2.0
+        self.declare_parameter('jpeg_quality', 80)
+        # 是否发布原始未压缩图像（默认关闭以节省带宽）
+        self.declare_parameter('pub_raw', False)
         
         # Get parameters
         config_file = self.get_parameter('config_file').value
         self.scale = self.get_parameter('scale').value
         self.fov_scale = self.get_parameter('fov_scale').value
+        self.pub_raw = self.get_parameter('pub_raw').value
         
-        # Initialize CV Bridge
-        self.bridge = CvBridge()
-        
+        # Initialize CV Bridge (not needed anymore - using numpy directly)
+        # self.bridge = CvBridge()
+
         # Load calibration data
         self.camera_params = {}
         self.load_calibration_file(config_file)
@@ -47,6 +78,7 @@ class OmniUndistortNode(Node):
         # Create subscribers and publishers
         self.image_subscribers = {}
         self.image_publishers = {}
+        self.compressed_publishers = {}
         
         for cam_name, input_topic in self.camera_topics.items():
             output_topic = input_topic.replace('/fisheye/', '/fisheye_rect/')
@@ -69,11 +101,19 @@ class OmniUndistortNode(Node):
                 output_topic,
                 10
             )
+            # compressed publisher (jpeg)
+            self.compressed_publishers[cam_name] = self.create_publisher(
+                CompressedImage,
+                output_topic + '/compressed',
+                10
+            )
             
             self.get_logger().info(f'Subscribed to {input_topic} -> Publishing to {output_topic}')
         
         # Undistortion maps cache
         self.undistort_maps = {}
+        # jpeg quality
+        self.jpeg_quality = int(self.get_parameter('jpeg_quality').value)
         
         self.get_logger().info(f'Omni undistortion initialized (scale={self.scale}, fov_scale={self.fov_scale})')
     
@@ -251,8 +291,8 @@ class OmniUndistortNode(Node):
     def image_callback(self, msg, cam_name):
         """Callback for image messages"""
         try:
-            # Convert ROS Image to OpenCV
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            # Convert ROS Image to OpenCV (NumPy 2.x 兼容，不用 cv_bridge)
+            cv_image = imgmsg_to_cv2(msg)
             
             # Get undistortion maps (may return None or (map_x,map_y,valid))
             map_res = self.get_undistort_maps(cam_name, cv_image.shape[:2])
@@ -278,12 +318,23 @@ class OmniUndistortNode(Node):
                 # Fallback to passthrough
                 undistorted = cv_image
             
-            # Convert back to ROS Image
-            out_msg = self.bridge.cv2_to_imgmsg(undistorted, encoding=msg.encoding)
-            out_msg.header = msg.header
-            
-            # Publish
-            self.image_publishers[cam_name].publish(out_msg)
+            # 只在有订阅者时才发布原始图像（节省带宽）
+            if self.pub_raw and self.image_publishers[cam_name].get_subscription_count() > 0:
+                out_msg = cv2_to_imgmsg(undistorted, msg.encoding, msg.header)
+                self.image_publishers[cam_name].publish(out_msg)
+
+            # 压缩图像：始终发布（订阅者连上就能立刻收到，不会漏帧）
+            try:
+                encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), self.jpeg_quality]
+                success, encimg = cv2.imencode('.jpg', undistorted, encode_param)
+                if success:
+                    comp = CompressedImage()
+                    comp.header = msg.header
+                    comp.format = 'jpeg'
+                    comp.data = encimg.tobytes()
+                    self.compressed_publishers[cam_name].publish(comp)
+            except Exception:
+                pass
             
         except Exception as e:
             self.get_logger().error(f'Error processing {cam_name}: {e}')

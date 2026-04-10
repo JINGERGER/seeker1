@@ -12,23 +12,29 @@ def generate_launch_description():
         default_value='false',
         description='是否使用image_transport传输图像'
     )
+
+    pub_fisheye_raw_arg = DeclareLaunchArgument(
+        'pub_fisheye_raw',
+        default_value='false',
+        description='是否发布原始鱼眼图像 /fisheye/*/image_raw 和 /all/compressed（默认关，去畸变节点会订阅）'
+    )
     
     pub_disparity_img_arg = DeclareLaunchArgument(
         'pub_disparity_img',
-        default_value='true',
-        description='是否发布视差图像'
+        default_value='false',
+        description='是否发布视差原始图像 /*/disparity/image_raw'
     )
     
     pub_disparity_arg = DeclareLaunchArgument(
         'pub_disparity',
-        default_value='true',
-        description='是否发布视差消息'
+        default_value='false',
+        description='是否发布视差消息 /*/disparity'
     )
     
     pub_imu_arg = DeclareLaunchArgument(
         'pub_imu',
-        default_value='true',
-        description='是否发布IMU数据'
+        default_value='false',
+        description='是否发布IMU数据 /imu_data_raw'
     )
     
     time_sync_arg = DeclareLaunchArgument(
@@ -67,6 +73,18 @@ def generate_launch_description():
         description='视场缩放 (>1.0: 视野变宽, <1.0: 视野变窄, 推荐: 1.2-2.0)'
     )
     
+    undistort_jpeg_quality_arg = DeclareLaunchArgument(
+        'undistort_jpeg_quality',
+        default_value='80',
+        description='去畸变压缩图像JPEG质量 (1-100)'
+    )
+
+    undistort_pub_raw_arg = DeclareLaunchArgument(
+        'undistort_pub_raw',
+        default_value='false',
+        description='是否同时发布未压缩原始图像（默认关闭以节省带宽）'
+    )
+    
     use_depth_arg = DeclareLaunchArgument(
         'use_depth',
         default_value='false',
@@ -80,6 +98,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'use_image_transport': LaunchConfiguration('use_image_transport'),
+            'pub_fisheye_raw': LaunchConfiguration('pub_fisheye_raw'),
             'pub_disparity_img': LaunchConfiguration('pub_disparity_img'),
             'pub_disparity': LaunchConfiguration('pub_disparity'),
             'pub_imu': LaunchConfiguration('pub_imu'),
@@ -104,7 +123,9 @@ def generate_launch_description():
         parameters=[{
             'config_file': 'seeker_omni_depth/kalibr_cam_chain.yaml',
             'scale': LaunchConfiguration('undistort_scale'),
-            'fov_scale': LaunchConfiguration('undistort_fov_scale')
+            'fov_scale': LaunchConfiguration('undistort_fov_scale'),
+            'jpeg_quality': LaunchConfiguration('undistort_jpeg_quality'),
+            'pub_raw': LaunchConfiguration('undistort_pub_raw'),
         }],
         condition=IfCondition(LaunchConfiguration('use_undistort'))
     )
@@ -131,6 +152,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_image_transport_arg,
+        pub_fisheye_raw_arg,
         pub_disparity_img_arg,
         pub_disparity_arg,
         pub_imu_arg,
@@ -140,6 +162,8 @@ def generate_launch_description():
         undistort_scale_arg,
         undistort_alpha_arg,
         undistort_fov_scale_arg,
+        undistort_jpeg_quality_arg,
+        undistort_pub_raw_arg,
         use_depth_arg,
         seeker_node,
         undistort_node,

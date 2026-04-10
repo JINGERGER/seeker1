@@ -16,6 +16,7 @@ public:
     declare_parameter("pub_disparity", true);
     declare_parameter("pub_imu", true);
     declare_parameter("time_sync", true);
+    declare_parameter("pub_fisheye_raw", false);
     declare_parameter("imu_link", "imu_link");
     declare_parameter("imu_topic", "imu_data_raw");
 
@@ -24,6 +25,7 @@ public:
     pub_disparity_ = get_parameter("pub_disparity").as_bool();
     pub_imu_ = get_parameter("pub_imu").as_bool();
     time_sync_ = get_parameter("time_sync").as_bool();
+    pub_fisheye_raw_ = get_parameter("pub_fisheye_raw").as_bool();
     imu_link_ = get_parameter("imu_link").as_string();
     imu_topic_ = get_parameter("imu_topic").as_string();
 
@@ -74,13 +76,9 @@ public:
 
     compressed_image_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>("all/compressed", 10);
 
-    // 图像发布者
+    // 图像发布者（始终创建，去畸变节点需要订阅）
     for (size_t i = 0; i < sdev_.dev_info.rgb_camera_number; ++i) {
-      // if (use_image_transport_) {
-      //   image_pubs_it_.push_back(it_->advertise(image_topics[i], 1));
-      // } else {
-        image_pubs_ros_.push_back(create_publisher<sensor_msgs::msg::Image>(image_topics[i], 10));
-      // }
+      image_pubs_ros_.push_back(create_publisher<sensor_msgs::msg::Image>(image_topics[i], 10));
     }
 
     // 深度和视差发布者
@@ -128,13 +126,16 @@ private:
 
     // 发布视差图像
     for (size_t i = 0; i < depth_camera_number; ++i) {
-      header->frame_id = "depth" + std::to_string(i);
-      sensor_msgs::msg::Image::SharedPtr img_msg = cv_bridge::CvImage(*header, "16UC1", images[i]).toImageMsg();
-      depth_pubs_[i]->publish(*img_msg);
+      if (pub_disparity_img_ && i < depth_pubs_.size()) {
+        header->frame_id = "depth" + std::to_string(i);
+        sensor_msgs::msg::Image::SharedPtr img_msg = cv_bridge::CvImage(*header, "16UC1", images[i]).toImageMsg();
+        depth_pubs_[i]->publish(*img_msg);
+      }
     }
 
     // 发布视差消息
     for (size_t i = 0; i < depth_camera_number; ++i) {
+      if (!pub_disparity_ || i >= disparity_pubs_.size()) continue;
       const int DPP = 256/4;
       const double inv_dpp = 1.0 / DPP;
       auto disparity_msg = std::make_shared<stereo_msgs::msg::DisparityImage>();
@@ -203,15 +204,15 @@ private:
   }
 
   void onMjpeg(const event_header_t& pheader, const uint8_t* data, int len) {
-    // publish compressed img
-    auto compressed = std::make_shared<sensor_msgs::msg::CompressedImage>();
-    compressed->header.stamp = rclcpp::Time(pheader.sec, pheader.nsec);
-    compressed->format = "jpeg";
-    
-    compressed->data.resize(len);
-    memcpy(compressed->data.data(), data, len);
-
-    compressed_image_pub_->publish(*compressed);
+    // publish compressed img (only if pub_fisheye_raw_ enabled)
+    if (pub_fisheye_raw_) {
+      auto compressed = std::make_shared<sensor_msgs::msg::CompressedImage>();
+      compressed->header.stamp = rclcpp::Time(pheader.sec, pheader.nsec);
+      compressed->format = "jpeg";
+      compressed->data.resize(len);
+      memcpy(compressed->data.data(), data, len);
+      compressed_image_pub_->publish(*compressed);
+    }
 
     cv::Mat frame = cv::imdecode(
       cv::Mat(1, len, CV_8UC1, const_cast<uint8_t*>(data)), 
@@ -250,6 +251,7 @@ private:
   bool pub_disparity_img_;
   bool pub_disparity_;
   bool pub_imu_;
+  bool pub_fisheye_raw_;
   bool time_sync_;
   std::string imu_link_;
   std::string imu_topic_;
