@@ -1,13 +1,27 @@
-# ROS2 Humble 支持
+# Orin 分支 — Jetson AGX Orin 平台优化
 
-本分支在原 ROS1 Noetic SDK 基础上添加了 **ROS2 Humble** 支持，主要贡献：
+> **当前分支**：`orin` | 平台：NVIDIA Jetson AGX Orin · L4T 36.x · CUDA 12.x · ROS2 Humble
 
+本分支在 ROS2 Humble 支持的基础上，针对 **Jetson AGX Orin** 平台进行了深度 GPU 优化，主要贡献：
+
+- ✅ **GPU JPEG 解码**：使用 nvJPEG 替换 CPU `cv::imdecode`，异步解码队列消除回调阻塞
+- ✅ **GPU 去畸变**：将 Python `cv2.remap` 替换为 C++ `cv::cuda::remap`，消除跨进程传输和 Python 节点全部开销
+- ✅ **减少 cudaMemcpy**：GPU → Image 一次拷贝（原来需经过 cv::Mat 中转两次）
+- ✅ **CPU 占用大幅下降**：~75% → **~20%**，帧率从 ~16 Hz 提升至 **~20 Hz**，延迟从 ~1s 降至 **<50ms**
+- ✅ **硬件自检脚本**：`script/seeker_hw_self_check.sh` 一键验收整条 ROS2 管线
 - ✅ **图像去畸变**：实现了 MEI (Mei Unified Omnidirectional) 相机模型的正确去畸变算法
 - ✅ **压缩图像输出**：去畸变后以 JPEG 压缩发布，带宽从 ~18 MB/s 降至 ~1-2 MB/s
-- ✅ **NumPy 2.x 兼容**：移除 cv_bridge 依赖，直接用 numpy 做 ROS↔OpenCV 转换（兼容 Ubuntu 22.04 / Python 3.10）
+- ✅ **NumPy 2.x 兼容**：移除 cv_bridge 依赖，直接用 numpy 做 ROS↔OpenCV 转换
 - ✅ **视差转深度**：支持将视差图转换为度量深度图，带运行时开关
-- ✅ **可配置视场**：支持通过 `fov_scale` 参数调整去畸变后的视野范围
 - ✅ **最小化默认话题**：所有非必要话题（视差/深度/IMU/原始鱼眼）默认关闭，按需开启
+
+### Orin 平台环境要求
+
+- **NVIDIA Jetson AGX Orin**（或同系列）
+- **L4T 36.x**（Ubuntu 22.04）
+- **ROS2 Humble**
+- **CUDA 12.x**（L4T 自带）
+- `sudo apt install libyaml-cpp-dev`
 
 ## ROS2 快速开始
 
@@ -56,6 +70,18 @@ ros2 param set /disparity_to_depth enabled true
 - `/{front,right,back,left}/disparity/image_raw` - 视差图像（`pub_disparity_img:=true`）
 - `/{front,right,back,left}/depth/image_raw` - 深度图（`use_depth:=true`）
 - `/imu_data_raw` - IMU 数据（`pub_imu:=true`）
+
+## 硬件自检
+
+```bash
+cd ~/ros2_ws/src/seeker1
+chmod +x script/seeker_hw_self_check.sh
+./script/seeker_hw_self_check.sh
+```
+
+脚本会自动检查 USB 识别、节点启动、关键话题是否存在及帧率，最终给出 `PASS/WARN/FAIL` 汇总。详见 [doc/HW_SELF_CHECK.md](./doc/HW_SELF_CHECK.md)。
+
+GPU 优化细节参见 [doc/gpu_jpeg_decode_optimization.md](./doc/gpu_jpeg_decode_optimization.md)。
 
 > 📄 完整流水线说明、标定方法和故障排查请参阅 [ROS2_SEEKER.md](./ROS2_SEEKER.md)
 
