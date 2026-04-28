@@ -93,7 +93,7 @@ class OmniUndistortNode(Node):
                 Image,
                 input_topic,
                 make_callback(cam_name),
-                10
+                1  # 深度1：丢弃积压旧帧，永远处理最新帧
             )
             
             self.image_publishers[cam_name] = self.create_publisher(
@@ -274,8 +274,7 @@ class OmniUndistortNode(Node):
         key = f"{cam_name}_{out_height}_{out_width}"
         
         if key in self.undistort_maps:
-            return self.undistort_maps[key]
-        
+            return self.undistort_maps[key]        
         self.get_logger().info(f'Creating undistort maps for {cam_name} ({out_width}x{out_height})...')
         
         result = self.create_omni_undistort_map(cam_name, out_height, out_width)
@@ -300,20 +299,13 @@ class OmniUndistortNode(Node):
             if map_res is not None:
                 map_x, map_y, valid = map_res
 
-                # Apply undistortion using replicate border to avoid black edges
-                undistorted = cv2.remap(cv_image, map_x, map_y, cv2.INTER_CUBIC,
+                undistorted = cv2.remap(cv_image, map_x, map_y, cv2.INTER_LINEAR,
                                        borderMode=cv2.BORDER_REPLICATE)
 
-                # Resize original to output size to fill invalid regions (avoid flicker)
-                out_h, out_w = undistorted.shape[:2]
-                resized_orig = cv2.resize(cv_image, (out_w, out_h), interpolation=cv2.INTER_LINEAR)
-
-                # Fill invalid pixels from resized original to avoid transient black pixels
-                if undistorted.ndim == 3:
-                    mask3 = np.repeat(valid[:, :, np.newaxis], undistorted.shape[2], axis=2)
-                    undistorted[~mask3] = resized_orig[~mask3]
-                else:
-                    undistorted[~valid] = resized_orig[~valid]
+                # mask3 按 undistorted 尺寸构建，与输入尺寸无关
+                mask3 = np.repeat(valid[:, :, np.newaxis], undistorted.shape[2], axis=2)
+                undistorted[~mask3] = cv2.resize(cv_image, (undistorted.shape[1], undistorted.shape[0]),
+                                                 interpolation=cv2.INTER_LINEAR)[~mask3]
             else:
                 # Fallback to passthrough
                 undistorted = cv_image

@@ -51,8 +51,8 @@ def generate_launch_description():
     
     use_undistort_arg = DeclareLaunchArgument(
         'use_undistort',
-        default_value='true',
-        description='是否启用图像去畸变'
+        default_value='false',
+        description='是否启用 Python 去畸变节点（已被 C++ 内置替代，默认关闭）'
     )
     
     undistort_scale_arg = DeclareLaunchArgument(
@@ -104,6 +104,11 @@ def generate_launch_description():
             'pub_imu': LaunchConfiguration('pub_imu'),
             'time_sync': LaunchConfiguration('time_sync'),
             'imu_link': 'imu',
+            'pub_rect': True,
+            'calib_file': 'seeker_omni_depth/kalibr_cam_chain.yaml',
+            'undistort_scale': LaunchConfiguration('undistort_scale'),
+            'undistort_fov_scale': LaunchConfiguration('undistort_fov_scale'),
+            'jpeg_quality': LaunchConfiguration('undistort_jpeg_quality'),
         }]
     )
     

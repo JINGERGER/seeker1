@@ -8,6 +8,13 @@ find_package(sensor_msgs REQUIRED)
 find_package(stereo_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
+find_package(ament_index_cpp REQUIRED)
+find_package(CUDA REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(YAML yaml-cpp)
+
+set(NVJPEG_INCLUDE_DIR /usr/local/cuda/include)
+set(NVJPEG_LIB_DIR /usr/local/cuda/targets/aarch64-linux/lib)
 
 # 添加包含目录
 include_directories(
@@ -33,7 +40,13 @@ add_executable(seeker_node
 target_include_directories(seeker_node
   PRIVATE
     ${OpenCV_INCLUDE_DIRS}
+    /usr/local/include/opencv4
+    ${NVJPEG_INCLUDE_DIR}
+    ${CUDA_INCLUDE_DIRS}
+    ${YAML_INCLUDE_DIRS}
 )
+
+link_directories(${NVJPEG_LIB_DIR} /usr/local/lib)
 
 ament_target_dependencies(seeker_node
   rclcpp
@@ -41,12 +54,18 @@ ament_target_dependencies(seeker_node
   stereo_msgs
   cv_bridge
   image_transport
+  ament_index_cpp
 )
 
 target_link_libraries(seeker_node
   ${OpenCV_LIBRARIES}
+  opencv_cudawarping
+  opencv_imgcodecs
   seeker
   usb-1.0
+  ${CUDA_LIBRARIES}
+  nvjpeg
+  ${YAML_LIBRARIES}
 )
 
 # 安装规则
